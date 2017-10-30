@@ -229,15 +229,15 @@ Resources:
       LoadBalancerName: !Ref AWS::StackName
       Listeners:
       - LoadBalancerPort: '80'
-        InstancePort: '7777'
+        InstancePort: '80'
         Protocol: HTTP
         InstanceProtocol: HTTP
         PolicyNames:
           - StickyYesPolicy
       - LoadBalancerPort: '443'
-        InstancePort: '4443'
+        InstancePort: '80'
         Protocol: HTTPS
-        InstanceProtocol: HTTPS
+        InstanceProtocol: HTTP
         SSLCertificateId: !Ref CertificateParam
         PolicyNames:
           - ELBTLSPolicy
@@ -341,11 +341,7 @@ Resources:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 443
-        ToPort: 443
-        CidrIp: 0.0.0.0/0
+        CidrIp: 10.0.0.0/8
       - IpProtocol: tcp
         FromPort: 0
         ToPort: 65535
