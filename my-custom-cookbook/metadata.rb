@@ -1,4 +1,4 @@
-name             'example-custom-cookbook'
+name             'my-custom-cookbook'
 maintainer       'Paul Allen'
 maintainer_email 'cloud-devops@cornell.edu'
 license          'All rights reserved'
