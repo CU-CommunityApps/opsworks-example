@@ -1,3 +1,6 @@
 [submodule "aws"]
 	path = aws
 	url = https://github.com/chef-cookbooks/aws.git
+[submodule "opsworks-utils-cookbook"]
+	path = opsworks-utils-cookbook
+	url = https://github.com/CU-CommunityApps/opsworks-utils-cookbook.git
