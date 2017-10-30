@@ -37,7 +37,7 @@ Metadata:
         default: "Which VPC should this be deployed to?"
 Parameters:
   CertificateParam:
-    Default:
+    Default: ''
     Description: "ARN of the HTTPS certificate to use."
     Type: String
   ApplicationTagParam:
@@ -121,7 +121,7 @@ Resources:
         Version: '12'
       CustomCookbooksSource:
         Type: git
-        Url: git@github.com:CU-Cloud-Collab/opsworks-example.git
+        Url: https://github.com/CU-CommunityApps/opsworks-example.git
         Revision: !Ref CookbookRepoGitBranchParam
         # SshKey:
   exampleCustomLayer:
@@ -164,11 +164,11 @@ Resources:
           - { ZONE_ID: !Ref HostedZoneParam, SUB_DOMAIN: !Ref SubdomainParam, ENVIRONMENT_TAG_VALUE: !Ref EnvironmentTagValueParam, SNS_TOPIC_ARN: !Ref AlertSNSTopicParam, APPLICATION_TAG_VALUE: !Ref ApplicationTagParam}
       CustomRecipes:
         Setup:
-          - example-custom-cookbook::hook-setup
+          - my-custom-cookbook::hook-setup
         Configure:
-          - example-custom-cookbook::hook-configure
+          - my-custom-cookbook::hook-configure
         Shutdown:
-          - example-custom-cookbook::hook-shutdown
+          - my-custom-cookbook::hook-shutdown
       # VolumeConfigurations:
       # -
       #   MountPoint: /oracle
