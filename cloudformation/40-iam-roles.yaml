@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Create IAM resources required for example OpsWorks deployment`.
+Parameters:
+  HostedZoneParam:
+    Default: ''
+    Description: ID of the hosted zone in which to allow DNS records to be created
+    Type: AWS::Route53::HostedZone::Id
+  ApplicationTagParam:
+    Default: example
+    Description: Application tag value
+    Type: String
+  LoggingS3BucketParam:
+    Default: cu-example-logs
+    Description: Name of the S3 bucket for logging
+    Type: String
+Resources:
+  OpsWorksServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: example-opsworks-service-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+                Service: opsworks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSOpsWorksRole
+      Policies:
+        -
+          PolicyName: aws-opsworks-service-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - ec2:*
+                  - iam:PassRole
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:DescribeAlarms
+                  - elasticloadbalancing:*
+                Resource: '*'
+  exampleInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: example-opsworks-instance-profile
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+                Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        -
+          PolicyName: manage-tags
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - ec2:CreateTags
+                  - ec2:DescribeTags
+                  - ec2:DeleteTags
+                Resource: '*'
+        -
+          PolicyName: manage-route53-records
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - route53:ListHostedZones
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - route53:GetHostedZone
+                  - route53:ListResourceRecordSets
+                  - route53:ChangeResourceRecordSets
+                Resource: !Join [ '', [ 'arn:aws:route53:::hostedzone/', !Ref HostedZoneParam ] ]
+        -
+          PolicyName: manage-cloudwatch
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                Resource: '*'
+        -
+          PolicyName: log-to-S3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${LoggingS3BucketParam}/*"
+
+  exampleInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref exampleInstanceRole
+      InstanceProfileName: example-opsworks-instance-profile

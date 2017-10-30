@@ -1,0 +1,404 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Create OpsWorks stack for example application.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Network Configuration"
+        Parameters:
+          - VpcIdParam
+          - ELBSubnetsListParam
+          - DefaultSubnetIdParam
+      -
+        Label:
+          default: "Layer Instance Configuration"
+        Parameters:
+          - InstanceRoleParam
+      -
+        Label:
+          default: "DNS Configuration"
+        Parameters:
+          - HostedZoneParam
+          - SubdomainParam
+      -
+        Label:
+          default: "Misc. Configuration"
+        Parameters:
+          - ApplicationTagParam
+          - ApplicationLabelParam
+          - ServiceRoleParam
+          - AlertSNSTopicParam
+          - EnvironmentTagValueParam
+          - CookbookRepoGitBranchParam
+    ParameterLabels:
+      VPCID:
+        default: "Which VPC should this be deployed to?"
+Parameters:
+  CertificateParam:
+    Default:
+    Description: "ARN of the HTTPS certificate to use."
+    Type: String
+  ApplicationTagParam:
+    Default: example
+    Description: Application tag value
+    Type: String
+  ApplicationLabelParam:
+    Default: example
+    Description: Label for application (e.g., prefix for resources)
+    Type: String
+  ServiceRoleParam:
+    Default: example-opsworks-service-role
+    Description: The service role used for OpsWorks to operate; this must already exist
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9-]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+  InstanceRoleParam:
+    Default: example-opsworks-instance-profile
+    Description: Name of the IAM Instance Profile to use for EC2 instances; this must already exist
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9-]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+  VpcIdParam:
+    Default: ''
+    Description: ID of the VPC where the OpsWorks stack will be deployed
+    Type: AWS::EC2::VPC::Id
+  DefaultSubnetIdParam:
+    Default: ''
+    Description: Default subnet where instances will be deployed
+    Type: AWS::EC2::Subnet::Id
+  ELBSubnetsListParam:
+    Default: ''
+    Description: PUBIC subnets where ELB should be deployed
+    Type: List<AWS::EC2::Subnet::Id>
+  HostedZoneParam:
+    Default: ''
+    Description: ID of the hosted zone in which to allow DNS records to be created
+    Type: AWS::Route53::HostedZone::Id
+  SubdomainParam:
+    Default: ''
+    Description: Subdomain of the hosted zone associated with the Hosted Zone. E.g., cs.cucloud.net
+    Type: String
+  EnvironmentTagValueParam:
+    Default: dev
+    Description: 'Value to use for Environment tag value (i.e. "Environment" = "dev")'
+    Type: String
+  CookbookRepoGitBranchParam:
+    Default: master
+    Description: Which branch to use from the cookbook git repo
+    Type: String
+  AlertSNSTopicParam:
+    Default: arn:aws:sns:us-east-1:123456789012:alert-example
+    Description: ARN of the SNS topic where alerts should be sent
+    Type: String
+  LoggingS3BucketParam:
+    Default: cu-example-logs
+    Description: Bucket name for logs
+    Type: String
+Resources:
+  OpsWorksStack:
+    Type: AWS::OpsWorks::Stack
+    Properties:
+      Name: !Ref AWS::StackName
+      ServiceRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/${ServiceRoleParam}"
+      DefaultInstanceProfileArn: !Sub "arn:aws:iam::${AWS::AccountId}:instance-profile/${InstanceRoleParam}"
+      VpcId: !Ref VpcIdParam
+      DefaultSubnetId: !Ref DefaultSubnetIdParam
+      UseCustomCookbooks: 'true'
+      UseOpsworksSecurityGroups: 'false'
+      HostnameTheme: Layer_Dependent
+      # DefaultSshKeyName:
+      DefaultOs: 'Amazon Linux 2017.03'
+      ConfigurationManager:
+        Name: Chef
+        Version: '12'
+      CustomCookbooksSource:
+        Type: git
+        Url: git@github.com:CU-Cloud-Collab/opsworks-example.git
+        Revision: !Ref CookbookRepoGitBranchParam
+        # SshKey:
+  exampleCustomLayer:
+    Type: AWS::OpsWorks::Layer
+    Properties:
+      StackId: !Ref OpsWorksStack
+      Type: custom
+      Name: example-layer
+      Shortname: example-layer
+      EnableAutoHealing: true
+      AutoAssignElasticIps: false
+      AutoAssignPublicIps: false
+      InstallUpdatesOnBoot: true # defualts to true
+      CustomSecurityGroupIds:
+        - !Ref exampleInstanceSecurityGroup
+      CustomJson:
+        !Sub
+          - |
+            {
+              "instance-tags": [
+                { "key": "Application", "value": "${APPLICATION_TAG_VALUE}" },
+                { "key": "Environment", "value": "${ENVIRONMENT_TAG_VALUE}" }
+              ],
+              "route53": {
+                "zone_id": "${ZONE_ID}",
+                "subdomain": "${SUB_DOMAIN}"
+              },
+              "alarms": {
+                "notify_sns_topic_arns": [
+                  "${SNS_TOPIC_ARN}"
+                ]
+              },
+              "papertrail": {
+                "files": ["/var/log/cloud-init.log", "/var/log/yum.log"],
+                "host": "logs3.papertrailapp.com",
+                "port": "44909",
+                "protocol": "tls"
+              }
+            }
+          - { ZONE_ID: !Ref HostedZoneParam, SUB_DOMAIN: !Ref SubdomainParam, ENVIRONMENT_TAG_VALUE: !Ref EnvironmentTagValueParam, SNS_TOPIC_ARN: !Ref AlertSNSTopicParam, APPLICATION_TAG_VALUE: !Ref ApplicationTagParam}
+      CustomRecipes:
+        Setup:
+          - example-custom-cookbook::hook-setup
+        Configure:
+          - example-custom-cookbook::hook-configure
+        Shutdown:
+          - example-custom-cookbook::hook-shutdown
+      # VolumeConfigurations:
+      # -
+      #   MountPoint: /oracle
+      #   NumberOfDisks: 1
+      #   Size: 16
+      #   VolumeType: gp2
+      # LoadBasedAutoScaling:
+      #   DownScaling:
+      #     CpuThreshold: 0.0
+      #     IgnoreMetricsTime: 10
+      #     InstanceCount: 1
+      #     LoadThreshold: 0.0
+      #     MemoryThreshold: 0.0
+      #     ThresholdsWaitTime: 10
+      #   Enable: false
+      #   UpScaling:
+      #     CpuThreshold: 100
+      #     IgnoreMetricsTime: Inte5ger
+      #     InstanceCount: 1
+      #     LoadThreshold: 100
+      #     MemoryThreshold: 100
+      #     ThresholdsWaitTime: 5
+
+  CPUAlarm:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref AlertSNSTopicParam
+      AlarmDescription: Alarm when minimum cpu idle for the instances in the layer is below X%.
+      AlarmName: !Join [ '-', [ !Ref 'AWS::StackName', 'layer-cpu-alarm' ] ]
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        -
+          Name: LayerId
+          Value: !Ref exampleCustomLayer
+      EvaluationPeriods: 2
+      MetricName: cpu_idle
+      Namespace: AWS/OpsWorks
+      OKActions:
+        - !Ref AlertSNSTopicParam
+      Period: 300
+      Statistic: Minimum
+      Threshold: 15
+      TreatMissingData: ignore
+
+  ELBAttachment:
+    Type: AWS::OpsWorks::ElasticLoadBalancerAttachment
+    Properties:
+      ElasticLoadBalancerName:
+        Ref: ELB
+      LayerId:
+        Ref: exampleCustomLayer
+
+  ELB:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      LoadBalancerName: !Ref AWS::StackName
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '7777'
+        Protocol: HTTP
+        InstanceProtocol: HTTP
+        PolicyNames:
+          - StickyYesPolicy
+      - LoadBalancerPort: '443'
+        InstancePort: '4443'
+        Protocol: HTTPS
+        InstanceProtocol: HTTPS
+        SSLCertificateId: !Ref CertificateParam
+        PolicyNames:
+          - ELBTLSPolicy
+          - StickyYesPolicy
+      CrossZone: true
+      HealthCheck:
+        Target: HTTP:7777/
+        HealthyThreshold: '2'
+        UnhealthyThreshold: '2'
+        Interval: '30'
+        Timeout: '5'
+      AccessLoggingPolicy:
+        EmitInterval: 5
+        Enabled: true
+        S3BucketName: !Ref LoggingS3BucketParam
+        S3BucketPrefix: !Ref ApplicationLabelParam
+      Tags:
+        -
+          Key: Application
+          Value: !Ref ApplicationTagParam
+        -
+          Key: Environment
+          Value: !Ref EnvironmentTagValueParam
+      Scheme: internet-facing
+      Subnets: !Ref ELBSubnetsListParam
+      SecurityGroups:
+        - !Ref exampleELBSecurityGroup
+      ConnectionSettings:
+        IdleTimeout: 3600
+      ConnectionDrainingPolicy:
+        Enabled: true
+        Timeout: 300
+      Policies:
+        -
+          PolicyName: ELBTLSPolicy
+          PolicyType: SSLNegotiationPolicyType
+          Attributes:
+            -
+              Name: Reference-Security-Policy
+              Value: ELBSecurityPolicy-TLS-1-2-2017-01
+      LBCookieStickinessPolicy:
+        -
+          CookieExpirationPeriod: 300
+          PolicyName: StickyYesPolicy
+
+  ELBAlarmNoneHealthy:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref AlertSNSTopicParam
+      AlarmDescription: Alarm when there are no healthy hosts behind the ELB.
+      AlarmName: !Join [ '-', [ !Ref 'AWS::StackName', 'elb-no-healthy-hosts-alarm' ] ]
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        -
+          Name: LoadBalancerName
+          Value: !Ref ELB
+      EvaluationPeriods: 2
+      MetricName: HealthyHostCount
+      Namespace: AWS/ELB
+      OKActions:
+        - !Ref AlertSNSTopicParam
+      Period: 60
+      Statistic: Minimum
+      Threshold: 1
+      TreatMissingData: breaching
+
+  ELBAlarmTooManyHealthy:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref AlertSNSTopicParam
+      AlarmDescription: Alarm when there are no healthy hosts behind the ELB.
+      AlarmName: !Join [ '-', [ !Ref 'AWS::StackName', 'elb-too-many-healthy-hosts-alarm' ] ]
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        -
+          Name: LoadBalancerName
+          Value: !Ref ELB
+      EvaluationPeriods: 2
+      MetricName: HealthyHostCount
+      Namespace: AWS/ELB
+      OKActions:
+        - !Ref AlertSNSTopicParam
+      Period: 60
+      Statistic: Minimum
+      Threshold: 1
+      TreatMissingData: notBreaching
+
+  exampleInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'security group applied to example custom instances'
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 10.0.0.0/8
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        SourceSecurityGroupId: !GetAtt exampleELBSecurityGroup.GroupId
+      Tags:
+        -
+          Key: Name
+          Value: !Join [ '-', [ !Ref ApplicationLabelParam, !Ref EnvironmentTagValueParam, 'instance-security-group' ] ]
+        -
+          Key: Application
+          Value: !Ref ApplicationTagParam
+        -
+          Key: Environment
+          Value: !Ref EnvironmentTagValueParam
+      VpcId: !Ref VpcIdParam
+  exampleELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'security group applied to example custom ELB'
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      Tags:
+        -
+          Key: Name
+          Value: !Join [ '-', [ !Ref ApplicationLabelParam, !Ref EnvironmentTagValueParam, 'elb-security-group' ] ]
+        -
+          Key: Application
+          Value: !Ref ApplicationTagParam
+        -
+          Key: Environment
+          Value: !Ref EnvironmentTagValueParam
+      VpcId: !Ref VpcIdParam
+
+  ELBDNSRecord:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZoneParam
+      Comment: Alias for example Custom public ELB
+      RecordSets:
+      - Name: !Join [ '.', [ !Ref "AWS::StackName", !Ref SubdomainParam, '' ] ]
+        Type: A
+        AliasTarget:
+          HostedZoneId: !GetAtt ELB.CanonicalHostedZoneNameID
+          DNSName: !GetAtt ELB.DNSName
+
+Outputs:
+  DNSNameOut:
+    Description: DNS name of the ELB endpoint
+    Value: !Join [ '.', [ !Ref "AWS::StackName", !Ref SubdomainParam, '' ] ]

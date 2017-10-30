@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Create S3 bucket for logs.
+Parameters:
+  ApplicationTagParam:
+    Default: example
+    Description: Application tag value
+    Type: String
+  LoggingS3BucketParam:
+    Default: cu-example-logs
+    Description: Bucket name for logs
+    Type: String
+Resources:
+  LoggingS3Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      # AccessControl: String
+      BucketName: !Ref LoggingS3BucketParam
+      # CorsConfiguration:
+      #   CORS Configuration
+      LifecycleConfiguration:
+        Rules:
+          -
+            # ExpirationDate: String
+            ExpirationInDays: 365
+            Id: ArchiveToGlacier
+            # NoncurrentVersionExpirationInDays: Integer
+            # NoncurrentVersionTransition (deprecated):
+            #   NoncurrentVersionTransition type
+            # NoncurrentVersionTransitions:
+            #   - NoncurrentVersionTransition type
+            # Prefix: String
+            Status: Enabled
+            # Transition (deprecated):
+            #   Transition type
+            Transitions:
+              -
+                StorageClass: GLACIER
+                # TransitionDate: String
+                TransitionInDays: 30
+      # LoggingConfiguration:
+      #   Logging Configuration
+      # NotificationConfiguration:
+      #   Notification Configuration
+      # ReplicationConfiguration:
+      #   Replication Configuration
+      Tags:
+        -
+          Key: Application
+          Value: !Ref ApplicationTagParam
+      # VersioningConfiguration:
+      #   Versioning Configuration
+      # WebsiteConfiguration:
+      #   Website Configuration Type
+  LoggingS3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref LoggingS3BucketParam
+      PolicyDocument:
+        Statement:
+          -
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub "arn:aws:s3:::${LoggingS3BucketParam}/*"
+            Principal:
+              AWS:
+                - '127311923021'
+#
+# Outputs:
+#   S3BucketArn:
+#     Description: ARN of the new S3 Bucket
+#     Value: !GetAtt LoggingS3Bucket.Arn
+#     Export:
+#       Name: !Join ['', [!Ref 'AWS::StackName', '-LoggingS3BucketArn' ] ]
