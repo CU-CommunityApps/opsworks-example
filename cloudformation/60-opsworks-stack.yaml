@@ -244,7 +244,7 @@ Resources:
           - StickyYesPolicy
       CrossZone: true
       HealthCheck:
-        Target: HTTP:7777/
+        Target: HTTP:80/
         HealthyThreshold: '2'
         UnhealthyThreshold: '2'
         Interval: '30'
