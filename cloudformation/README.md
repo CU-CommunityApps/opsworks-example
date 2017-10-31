@@ -10,7 +10,7 @@ These templates require a few existing AWS resources as parameters.
   * You will need the entire ARN of the topic. It does not have to be owned by the current AWS account, but if it isn't, you will need to make sure that the current AWS account is allowed to send notifications to the topic in the other AWS account.
 * A Route53 hosted zone. This is required because EC2 instances in the OpsWorks Layer run Chef recipes that create, update, and delete Route53 DNS records in that hosted zone.
   * You will need to know the Hosted Zone ID (e.g, Z1K99BI3YFXQK) and the corresponding domain (e.g., mydomain.cucloud.net).
-* An AWS Certificate Manager HTTPS certificate, or a certificate that has been uploaded to IAM.
+* An AWS Certificate Manager HTTPS certificate, or a certificate that has been uploaded to IAM. This certificate is attached to the ELB associated with the OpsWorks Stack/Layer.
   * You will need the ARN of the certificate.
 
 ## Templates
