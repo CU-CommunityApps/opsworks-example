@@ -4,9 +4,11 @@
 
 This is an example repo that can be used directly by OpsWorks. It uses two auxiliary cookbooks (aws and opsworks-utils-cookbook) that are embedded in this repo as git submodules. It contains one custom cookbook (my-custom-cookbook) with trivial functionality that leverages the opsworks-utils-cookbook.
 
-The CloudFormation templates in the [cloudformation](cloudformation/) directory can be used to create both the OpsWorks stack and most of the supporting AWS resources (e.g. IAM instance profile).
-
 This repo is used as an example for a Cornell Software Development Special Interest Group presentation. See https://confluence.cornell.edu/x/pCvrF.
+
+## Using this repo
+
+The CloudFormation templates in the [cloudformation](cloudformation/) directory can be used to create both the OpsWorks stack and most of the supporting AWS resources (e.g. IAM instance profile). Use those templates, in order, to create an example OpsWorks Stack.
 
 ## Some Hints for using git
 
